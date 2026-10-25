@@ -371,6 +371,50 @@ class Network(unittest.TestCase):
         self.assertIn("check the ticker", str(cm.exception).replace("symbol", "ticker"))
 
 
+class VolScale(unittest.TestCase):
+    def test_off_by_default_and_alpha_zero_changes_nothing(self):
+        base = machine(replays=2000)
+        self.assertIsNone(base["vol_scale"])
+        zero = machine(replays=2000, vol_alpha=0)
+        self.assertEqual(sha(base["mc"]), sha(zero["mc"]))
+
+    def test_pool_scaling_and_clipping(self):
+        def day(rng):                    # flat closes at 100, every bar's range is +-rng
+            return [{"o": 100.0, "h": 100.0 + rng, "l": 100.0 - rng, "c": 100.0} for _ in range(tm.USED_BARS)]
+        sessions = [("a", day(1.0)), ("b", day(0.25)), ("c", day(10.0))]
+        entry_day = {i: b for i, b in enumerate(day(0.5))}
+        scales, today = tm.vol_scales(sessions, entry_day, 5, 1.0)
+        self.assertAlmostEqual(today, 1.0 / 100)                       # (high - low) / previous close
+        self.assertEqual([round(x, 2) for x in scales], [0.5, 2.0, 0.5])   # 0.5 and 2.0 are the clips; 0.5 / 1 = 0.5
+        half, _ = tm.vol_scales(sessions, entry_day, 5, 0.5)
+        self.assertEqual([round(x, 3) for x in half], [0.707, 1.414, 0.5])
+        pool = tm.build_pool(sessions, [2.0, 1.0, 0.5])
+        self.assertAlmostEqual(pool[3][0][1], 1.02)                    # high ratio 1.01 scaled x2
+        self.assertAlmostEqual(pool[3][1][1], 1.0025)
+        self.assertAlmostEqual(pool[3][2][2], 0.95)                    # low ratio 0.90 scaled x0.5
+        self.assertEqual(tm.build_pool(sessions)[3], tm.build_pool(sessions, [1.0, 1.0, 1.0])[3])
+
+    def test_the_document_says_what_was_done_and_the_run_is_repeatable(self):
+        a, b = machine(replays=2000, vol_alpha=0.5), machine(replays=2000, vol_alpha=0.5)
+        self.assertEqual(sha(a["mc"]), sha(b["mc"]))
+        vs = a["vol_scale"]
+        self.assertEqual(vs["alpha"], 0.5)
+        self.assertTrue(0.5 <= vs["scale_min"] <= vs["scale_median"] <= vs["scale_max"] <= 2.0)
+        self.assertAlmostEqual(a["mc"]["p_target"] + a["mc"]["p_stop"] + a["mc"]["p_neither"], 1.0, places=2)
+        self.assertIn("Volatility scaling on (exponent 0.5)", " ".join(tm.report(a)))
+        self.assertNotIn("Volatility scaling", " ".join(tm.report(machine(replays=2000))))
+
+    def test_the_odds_move_when_the_scale_does(self):
+        base = machine(replays=4000)["mc"]
+        scaled = machine(replays=4000, vol_alpha=1.0)["mc"]
+        self.assertNotEqual(base["p_target"], scaled["p_target"])
+
+    def test_alpha_is_checked(self):
+        for bad in (-0.1, 2.5):
+            with self.assertRaises(tm.TMError):
+                machine(vol_alpha=bad)
+
+
 class Cli(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp()

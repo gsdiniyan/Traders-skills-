@@ -41,6 +41,12 @@ default 2), `--tick 0.05` (the price tick for the history replay), `--offline FI
 (a saved Yahoo chart, `.json` or `.json.gz`, or a folder holding
 `<SYMBOL>-60d5m.json.gz`), `--now "2026-10-25 12:00"` (IST), `--json`.
 
+`--vol-scale 0.5` rescales each past session to today's volatility so far before drawing from it
+(a calm past day is stretched, a wild one is shrunk, never beyond x0.5 to x2). It is off by default. On 393
+scanner signals of 5-23 Oct 2026 it cut the 3-way Brier score from 0.598 to 0.555 on days not used to pick the
+setting, and brought the share of "neither" closer to what happened. One sample of 15 days: treat it as a tested
+default, not a proof.
+
 ## What it reads and writes
 
 | file | what |

@@ -368,14 +368,47 @@ def full_sessions(days, before):
 
 # ---------------------------------------------------------------- the simulation (sim.py)
 
-def build_pool(sessions):
-    """pool[i] = every past session's bar i as (o, h, l, c) / bar i-1's close, in date order."""
+def build_pool(sessions, scales=None):
+    """pool[i] = every past session's bar i as (o, h, l, c) / bar i-1's close, in date order. With `scales` (one factor
+    per session, from vol_scales) each bar's move away from 1 is multiplied by that session's factor."""
     pool = [[] for _ in range(USED_BARS)]
-    for _, D in sessions:
+    for j, (_, D) in enumerate(sessions):
+        s = 1.0 if scales is None else scales[j]
         for i in range(1, USED_BARS):
             pc = D[i - 1]["c"]
-            pool[i].append((D[i]["o"] / pc, D[i]["h"] / pc, D[i]["l"] / pc, D[i]["c"] / pc))
+            r = (D[i]["o"] / pc, D[i]["h"] / pc, D[i]["l"] / pc, D[i]["c"] / pc)
+            pool[i].append(r if s == 1.0 else tuple(1.0 + s * (x - 1.0) for x in r))
     return pool
+
+
+# Volatility scaling. A past session that was calmer or wilder than today is rescaled to today's level before its bars are
+# drawn: factor = (today's mean bar range up to the entry / that session's)^alpha, kept between VOL_LO and VOL_HI. On 393
+# real scanner signals (5-23 Oct 2026, Dhan bars), alpha 0.5 cut the 3-way Brier score from 0.598 to 0.555 on days not used
+# to choose it (0.475 to 0.460 the other way round) and fixed the over-predicted "neither" (29 % to 19 %, real 15 %).
+# alpha 1 was slightly worse than 0.5 on both halves. Off by default (alpha 0): the skill's numbers do not change unless asked.
+VOL_LO, VOL_HI = 0.5, 2.0
+
+
+def bar_range_mean(get, k):
+    """Mean of (high - low) / previous close over bars 1..k; get(i) returns bar i as a dict or None."""
+    xs = []
+    for i in range(1, k + 1):
+        b, prev = get(i), get(i - 1)
+        if b and prev and prev["c"]:
+            xs.append((b["h"] - b["l"]) / prev["c"])
+    return sum(xs) / len(xs) if xs else None
+
+
+def vol_scales(sessions, entry_day, k, alpha, lo=VOL_LO, hi=VOL_HI):
+    """(factor per session, today's mean bar range to the entry), or (None, None) when today's cannot be measured."""
+    today = bar_range_mean(entry_day.get, k)
+    if not today:
+        return None, None
+    out = []
+    for _, D in sessions:
+        v = bar_range_mean(lambda i: D[i], k)
+        out.append(1.0 if not v else min(hi, max(lo, (today / v) ** alpha)))
+    return out, today
 
 
 def pct(a, q):
@@ -719,12 +752,14 @@ def verdict_notes(mc):
     return notes
 
 
-def time_machine(text, plan, now_utc, replays=10000, seed=19, window=2, until=None, source="yahoo"):
+def time_machine(text, plan, now_utc, replays=10000, seed=19, window=2, until=None, source="yahoo", vol_alpha=0.0):
     """Chart JSON text + a normalized plan -> the timemachine.json document."""
     if not 1 <= replays <= 1000000:
         raise TMError("--replays must be between 1 and 1,000,000")
     if not 0 <= window <= 10:
         raise TMError("--window must be between 0 and 10 bars")
+    if not 0 <= vol_alpha <= 2:
+        raise TMError("--vol-scale must be between 0 and 2 (0 = off, 0.5 = the tested setting)")
     sym = plan["symbol"]
     result = chart_result(text, sym)
     meta, bars, dropped = parse_bars(result, now_utc)
@@ -771,7 +806,13 @@ def time_machine(text, plan, now_utc, replays=10000, seed=19, window=2, until=No
     if len(sessions) < MIN_SESSIONS:
         raise TMError("only %d full session(s) of %s before %s in the data; the time machine needs at least %d"
                       % (len(sessions), sym, plan["date"], MIN_SESSIONS))
-    pool = build_pool(sessions)
+    scales, v_today = vol_scales(sessions, entry_day, k, vol_alpha) if vol_alpha else (None, None)
+    pool = build_pool(sessions, scales)
+    vol_note = None
+    if vol_alpha:
+        vol_note = ({"alpha": vol_alpha, "today_mean_range_pct": round(100 * v_today, 3), "scale_min": round(min(scales), 2),
+                     "scale_median": round(sorted(scales)[len(scales) // 2], 2), "scale_max": round(max(scales), 2)}
+                    if scales else {"alpha": vol_alpha, "skipped": "today's volatility could not be measured up to the entry"})
     mc = simulate(pool, plan["entry"], plan["stop"], plan["target"], k, last, replays, seed, window, plan["side"])
     mc = dict(mc, until=clock24(until_min), pool_sessions=len(sessions), pool_from=sessions[0][0],
               pool_to=sessions[-1][0],
@@ -799,6 +840,7 @@ def time_machine(text, plan, now_utc, replays=10000, seed=19, window=2, until=No
         "verdict": verdict(mc),
         "verdict_notes": verdict_notes(mc),
         "warnings": warn,
+        "vol_scale": vol_note,
         "note": ("A simulation built from %s's own last %d full sessions. It is not a prediction: results, "
                  "news, circuit limits and halts can do things those sessions never did. It leaves out brokerage and "
                  "taxes (see /trader-budget). Same seed, same numbers." % (sym, len(sessions))),
@@ -855,6 +897,13 @@ def report(doc):
     lines += ["", doc["verdict"]] + list(doc.get("verdict_notes") or []) + [""]
     for w in doc.get("warnings") or []:
         lines.append("Note: " + w + ".")
+    vs = doc.get("vol_scale")
+    if vs and vs.get("scale_median") is not None:
+        lines.append("Volatility scaling on (exponent %g): each past session's moves were scaled to today's bar range so far "
+                     "(%.3f %% a bar), by x%.2f to x%.2f, median x%.2f." % (vs["alpha"], vs["today_mean_range_pct"], vs["scale_min"],
+                                                                          vs["scale_max"], vs["scale_median"]))
+    elif vs:
+        lines.append("Volatility scaling was asked for but skipped: " + vs["skipped"] + ".")
     if doc["data"]["short_sessions_left_out"]:
         lines.append("Left out %d short session(s) (Muhurat sessions or gaps): %s."
                      % (len(doc["data"]["short_sessions_left_out"]),
@@ -926,7 +975,7 @@ def compute(a):
         text, source = read_offline(a.offline, plan["symbol"]), "offline"
     else:
         text, source = fetch_chart(plan["symbol"]), "yahoo"
-    return time_machine(text, plan, now, a.replays, a.seed, a.window, a.until, source)
+    return time_machine(text, plan, now, a.replays, a.seed, a.window, a.until, source, getattr(a, "vol_scale", 0.0) or 0.0)
 
 
 def cmd_run(a):
@@ -986,6 +1035,8 @@ def main(argv=None):
         p.add_argument("--replays", type=int, default=10000)
         p.add_argument("--seed", type=int, default=19)
         p.add_argument("--window", type=int, default=2, help="draw from the same time of day +- this many bars")
+        p.add_argument("--vol-scale", type=float, default=0.0, metavar="ALPHA",
+                       help="scale each past session to today's volatility so far, exponent ALPHA (0 = off, 0.5 = tested on real signals)")
         p.add_argument("--until", help="end each replay at this time (default: the plan's flat_by, 15:15, else the 15:30 close)")
         p.add_argument("--offline", metavar="FILE", help="a saved Yahoo chart JSON (.json or .json.gz), no network")
         p.add_argument("--now", help='pretend it is this time ("2026-10-23 10:15" IST, or ISO with Z)')
