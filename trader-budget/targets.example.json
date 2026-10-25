@@ -1,0 +1,10 @@
+{
+  "source": "An example split of Rs 5,00,000 across four large NSE stocks (weights are illustrative, not a recommendation)",
+  "as_of": "2026-10-25",
+  "weights": [
+    {"ticker": "RELIANCE", "name": "Reliance Industries", "weight": 40},
+    {"ticker": "TCS", "name": "Tata Consultancy Services", "weight": 30},
+    {"ticker": "INFY", "name": "Infosys", "weight": 20},
+    {"ticker": "ITC", "name": "ITC", "weight": 10}
+  ]
+}
