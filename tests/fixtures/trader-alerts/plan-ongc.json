@@ -1,0 +1,4 @@
+{"created_by": "trader-exit", "symbol": "ONGC", "side": "buy", "date": "2026-10-23", "setup": "orb",
+ "entry": 225.74, "entry_time": "10:05", "entry_bar": 9, "interval": "5m",
+ "stop": 225.10, "stop_label": "opening-range midpoint", "target": 227.00, "target_label": "2R (two times the risk)",
+ "risk_per_share": 0.64, "reward_risk": 1.97, "flat_by": "15:15", "tick_size": 0.05}

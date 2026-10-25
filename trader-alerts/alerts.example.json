@@ -1,0 +1,9 @@
+{
+  "rules": [
+    {"id": "opening-bell", "type": "opening_bell"},
+    {"id": "ongc-plan-stop", "symbol": "ONGC", "type": "stop", "price": 225.1, "note": "plan stop: opening-range midpoint", "date": "2026-10-23"},
+    {"id": "ongc-plan-target", "symbol": "ONGC", "type": "target", "price": 227.0, "note": "plan target: 2R (two times the risk)", "date": "2026-10-23"},
+    {"id": "ongc-flat-by", "symbol": "ONGC", "type": "time", "at": "15:15", "label": "flat-by time", "date": "2026-10-23"},
+    {"id": "itc-move-3", "symbol": "ITC", "type": "pct_move", "pct": 3}
+  ]
+}
