@@ -1,0 +1,16 @@
+Traders Skills (India)
+Copyright (c) 2026 Ganesh S Diniyan
+
+This pack is an adaptation for the Indian market (NSE) of day-trader-skill,
+https://github.com/Jakeschincariol/day-trader-skill, Copyright (c) 2026 Jake Schincariol,
+released under the MIT License. The structure (eleven skills, each a SKILL.md and a
+standard-library Python tool, joined through a shared trader/ folder), the safety rules and
+the method of each skill come from that project. The code, data sources, calendar,
+currency, tests and fixtures in this repository were rewritten for NSE and SEBI data.
+
+Both copyright lines are kept in LICENSE, as the MIT License requires.
+
+Data: the tools read free public data (Yahoo Finance, NSE and the SEBI disclosures NSE
+publishes, Google News RSS). That data belongs to its owners and is used under their own
+terms. The fixtures in tests/fixtures are small saved samples of those answers, kept so the
+tests run offline.

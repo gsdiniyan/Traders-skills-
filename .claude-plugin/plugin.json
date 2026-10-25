@@ -1,0 +1,24 @@
+{
+  "name": "traders-skills",
+  "description": "11 Claude skills for day trading on the NSE: scan hundreds of charts, track announcements and news, time every entry and exit, and replay every outcome before you risk a rupee.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Ganesh S Diniyan",
+    "url": "https://github.com/gsdiniyan"
+  },
+  "homepage": "https://github.com/gsdiniyan/Traders-skills-",
+  "repository": "https://github.com/gsdiniyan/Traders-skills-",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "claude-skills",
+    "day-trading",
+    "india",
+    "nse",
+    "nifty",
+    "backtesting",
+    "opening-range-breakout",
+    "paper-trading"
+  ],
+  "skills": "./"
+}

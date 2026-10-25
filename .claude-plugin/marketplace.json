@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "traders-skills",
+  "description": "The Traders skill pack for Claude, built for the Indian market (NSE)",
+  "owner": {
+    "name": "Ganesh S Diniyan",
+    "url": "https://github.com/gsdiniyan"
+  },
+  "plugins": [
+    {
+      "name": "traders-skills",
+      "description": "Eleven Claude skills for day trading on the NSE: a chart scanner, a news monitor, an entry timer, an exit planner, a time machine that replays 10,000 sessions, a risk manager, a budget manager, an order ticket desk (never places an order), price alerts, an earnings analyst and a bulk-deal and insider tracker.",
+      "source": "./",
+      "category": "productivity",
+      "homepage": "https://github.com/gsdiniyan/Traders-skills-"
+    }
+  ]
+}

@@ -341,7 +341,7 @@ class NoNetwork(unittest.TestCase):
         self.assertIn("Never places an order", text)
         for gone in ("Alpaca", "place_stock_order", "Allow once", "Interactive Brokers", "dollar"):
             self.assertNotIn(gone, text)
-        self.assertNotIn("—", text)
+        self.assertNotIn(chr(0x2014), text)
 
 
 if __name__ == "__main__":
